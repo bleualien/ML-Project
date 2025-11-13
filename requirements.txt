@@ -1,0 +1,7 @@
+flask>=2.0
+ultralytics>=8.0.0
+torch     # install the CPU wheel for your platform if needed
+opencv-python-headless
+numpy
+Pillow
+networkx

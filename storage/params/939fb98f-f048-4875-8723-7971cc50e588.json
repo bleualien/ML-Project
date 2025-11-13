@@ -1,0 +1,77 @@
+{
+  "id": "939fb98f-f048-4875-8723-7971cc50e588",
+  "type": "waste",
+  "client_id": null,
+  "uploaded_filename": "939fb98f-f048-4875-8723-7971cc50e588_20251113T073344Z_IMG_20250927_123103_jpg.rf.87973e3ebb465780a68a032b5090adcc.jpg",
+  "annotated_filename": "939fb98f-f048-4875-8723-7971cc50e588_annotated.jpg",
+  "params": {
+    "detections": [
+      {
+        "xyxy": [
+          184.546630859375,
+          212.54483032226562,
+          502.1412353515625,
+          427.4015197753906
+        ],
+        "conf": 0.3083190321922302,
+        "class_id": 4,
+        "class_name": "residual",
+        "area_px": 68237.32530936599,
+        "area_pct": 0.1665950324935693,
+        "density": 1.0,
+        "proximity_pct": 0.3321851253509521
+      },
+      {
+        "xyxy": [
+          223.73764038085938,
+          219.2636260986328,
+          496.5690612792969,
+          409.71405029296875
+        ],
+        "conf": 0.4793546795845032,
+        "class_id": 3,
+        "class_name": "plastic",
+        "area_px": 51960.85984365083,
+        "area_pct": 0.12685756797766318,
+        "density": 1.0,
+        "proximity_pct": 0.35982179641723633
+      }
+    ],
+    "primary": {
+      "xyxy": [
+        184.546630859375,
+        212.54483032226562,
+        502.1412353515625,
+        427.4015197753906
+      ],
+      "conf": 0.3083190321922302,
+      "class_id": 4,
+      "class_name": "residual",
+      "area_px": 68237.32530936599,
+      "area_pct": 0.1665950324935693,
+      "density": 1.0,
+      "proximity_pct": 0.3321851253509521
+    },
+    "waste_type": "residual"
+  },
+  "timestamp": "20251113T073345Z",
+  "routing": {
+    "departments": [
+      "Construction",
+      "Roads",
+      "Ward Office",
+      "Ward Office"
+    ],
+    "priority": "high",
+    "scores": {
+      "Waste Management": 0.1405445635318756,
+      "Construction": 0.44008177518844604,
+      "Municipality": 0.29177770018577576,
+      "Roads": 0.6156872510910034,
+      "Electricity": 0.0,
+      "Water": 0.22266577184200287,
+      "Ward Office": 1.0
+    },
+    "auto_assigned_department": "Ward Office"
+  }
+}

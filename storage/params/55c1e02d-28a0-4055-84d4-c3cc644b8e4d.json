@@ -1,0 +1,62 @@
+{
+  "id": "55c1e02d-28a0-4055-84d4-c3cc644b8e4d",
+  "type": "waste",
+  "client_id": null,
+  "uploaded_filename": "55c1e02d-28a0-4055-84d4-c3cc644b8e4d_20251113T073655Z_8902080104581_1-640x640_png.rf.e340829315e9ea84c8724742b67ba195.jpg",
+  "annotated_filename": "55c1e02d-28a0-4055-84d4-c3cc644b8e4d_annotated.jpg",
+  "params": {
+    "detections": [
+      {
+        "xyxy": [
+          227.26657104492188,
+          0.0,
+          421.3138732910156,
+          302.4054260253906
+        ],
+        "conf": 0.2895309329032898,
+        "class_id": 3,
+        "class_name": "plastic",
+        "area_px": 58680.95710480772,
+        "area_pct": 0.14326405543165946,
+        "density": 1.0,
+        "proximity_pct": 0.5274915218353271
+      }
+    ],
+    "primary": {
+      "xyxy": [
+        227.26657104492188,
+        0.0,
+        421.3138732910156,
+        302.4054260253906
+      ],
+      "conf": 0.2895309329032898,
+      "class_id": 3,
+      "class_name": "plastic",
+      "area_px": 58680.95710480772,
+      "area_pct": 0.14326405543165946,
+      "density": 1.0,
+      "proximity_pct": 0.5274915218353271
+    },
+    "waste_type": "plastic"
+  },
+  "timestamp": "20251113T073655Z",
+  "routing": {
+    "departments": [
+      "Construction",
+      "Roads",
+      "Ward Office",
+      "Waste Management"
+    ],
+    "priority": "high",
+    "scores": {
+      "Waste Management": 0.1405445635318756,
+      "Construction": 0.44008177518844604,
+      "Municipality": 0.29177770018577576,
+      "Roads": 0.6156872510910034,
+      "Electricity": 0.0,
+      "Water": 0.22266577184200287,
+      "Ward Office": 1.0
+    },
+    "auto_assigned_department": "Waste Management"
+  }
+}
