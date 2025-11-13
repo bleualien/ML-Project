@@ -1,0 +1,16 @@
+names:
+- glass
+- metal
+- paper
+- plastic
+- residual
+nc: 5
+roboflow:
+  license: CC BY 4.0
+  project: waste-detection-yolo-vykag
+  url: https://universe.roboflow.com/maryygraceden-q9bha/waste-detection-yolo-vykag/dataset/1
+  version: 1
+  workspace: maryygraceden-q9bha
+test: ../test/images
+train: ../train/images
+val: ../valid/images

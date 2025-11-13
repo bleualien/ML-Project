@@ -1,0 +1,26 @@
+# --- Core Framework ---
+Flask==3.0.3
+Flask-Cors==4.0.1
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+
+# --- Machine Learning / YOLO ---
+ultralytics==8.3.27
+torch>=2.3.0
+opencv-python==4.10.0.84
+numpy<2,>=1.26.0
+matplotlib==3.9.2
+
+# --- Database & Utilities ---
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.31
+python-dotenv==1.0.1
+
+# --- Image & File Handling ---
+Pillow==10.3.0
+
+# --- Optional (if you use API client testing or debugging) ---
+requests==2.32.3
+
+# --- Development Tools ---
+gunicorn==23.0.0
