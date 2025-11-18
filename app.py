@@ -2,7 +2,11 @@ import os
 import uuid
 import json
 from flask import Flask, request, jsonify, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
+from sentence_transformers import SentenceTransformer
+import numpy as np
+import shutil
 
 # local imports
 from utils.file_utils import ensure_dirs, allowed_file, secure_name, now_str, save_json
@@ -20,6 +24,17 @@ UPLOAD_DIR = os.path.join(STORAGE_DIR, 'uploads')
 ANNOTATED_DIR = os.path.join(STORAGE_DIR, 'annotated')
 PARAMS_DIR = os.path.join(STORAGE_DIR, 'params')
 
+DEPT_DIRS = {
+    "Waste Management": os.path.join(STORAGE_DIR, 'waste'),
+    "Water": os.path.join(STORAGE_DIR, 'water'),
+    "Electricity": os.path.join(STORAGE_DIR, 'electricity'),
+    "Roads": os.path.join(STORAGE_DIR, 'roads'),
+    "Ward Office": os.path.join(STORAGE_DIR, 'ward_office')
+}
+
+for d in [STORAGE_DIR, UPLOAD_DIR, ANNOTATED_DIR, PARAMS_DIR] + list(DEPT_DIRS.values()):
+    os.makedirs(d, exist_ok=True)
+
 WASTE_MODEL_PATH = os.environ.get(
     'WASTE_MODEL_PATH',
     r"C:\Files\Intern\server\runs\detect\waste_yolo_fast\weights\best.pt"
@@ -29,10 +44,8 @@ POTHOLE_MODEL_PATH = os.environ.get(
     r"C:\Files\Intern\server\runs\pothole_yolov8\weights\best.pt"
 )
 
-for d in [STORAGE_DIR, UPLOAD_DIR, ANNOTATED_DIR, PARAMS_DIR]:
-    os.makedirs(d, exist_ok=True)
-
 DEVICE = 'cpu'
+SIMILARITY_THRESHOLD = 0.5  # only assign departments above this similarity
 
 # ---------------- Model Loading ----------------
 print("Initializing models (CPU)...")
@@ -49,48 +62,33 @@ print("Initialization done.")
 # ---------------- Flask App ----------------
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:postgres@localhost:5432/smartcity'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+db = SQLAlchemy(app)
 
-# ---------------- AI-BASED DEPARTMENT ASSIGNMENT ----------------
-def assign_department_auto(record):
-    """
-    Automatically assign responsible department based on detection.
-    AI-ready: can later replace this with ML model or GNN logic.
-    """
+# ---------------- ML-based Department Assignment ----------------
+DEPARTMENTS = list(DEPT_DIRS.keys())
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+dept_embeddings = embedding_model.encode(DEPARTMENTS)
 
-    t = record.get('type')
-    params = record.get('params', {})
-    primary = params.get('primary', {})
-    cls_name = str(primary.get('class_name', '')).lower()
-    risk_score = primary.get('risk_score', 0)
+def assign_departments_ml_threshold(record, threshold=SIMILARITY_THRESHOLD):
+    primary = record.get("params", {}).get("primary", {})
+    cls_name = str(primary.get("class_name", "")).lower()
+    risk_score = primary.get("risk_score", 0)
 
-    # --- Rules for Waste ---
-    if t == 'waste':
-        if any(word in cls_name for word in ['plastic', 'paper', 'garbage', 'trash', 'bag']):
-            return "Waste Management"
-        elif any(word in cls_name for word in ['water', 'pipe', 'leak']):
-            return "Water"
-        elif any(word in cls_name for word in ['wire', 'electric', 'cable']):
-            return "Electricity"
-        else:
-            return "Ward Office"
+    cls_emb = embedding_model.encode([cls_name])[0]
+    sims = np.dot(dept_embeddings, cls_emb) / (np.linalg.norm(dept_embeddings, axis=1) * np.linalg.norm(cls_emb))
+    
+    assigned_depts = [DEPARTMENTS[i] for i, sim in enumerate(sims) if sim >= threshold]
 
-    # --- Rules for Pothole ---
-    elif t == 'pothole':
-        if 'road' in cls_name or 'asphalt' in cls_name or 'pothole' in cls_name:
-            return "Roads"
-        elif 'water' in cls_name or 'drain' in cls_name:
-            return "Water"
-        elif 'wire' in cls_name or 'electric' in cls_name:
-            return "Electricity"
-        elif risk_score and risk_score > 0.7:
-            # deep or large pothole → Ward Office escalation
-            return "Ward Office"
-        else:
-            return "Roads"
+    if not assigned_depts:
+        assigned_depts = ["Ward Office"]
 
-    return "Ward Office"  # fallback
+    if record.get("type") == "pothole" and risk_score > 0.7 and "Ward Office" not in assigned_depts:
+        assigned_depts.append("Ward Office")
 
+    return assigned_depts
 
 # ---------------- Helpers ----------------
 def save_uploaded_file(file_storage, prefix=None):
@@ -99,7 +97,6 @@ def save_uploaded_file(file_storage, prefix=None):
     stored_path = os.path.join(UPLOAD_DIR, stored_name)
     file_storage.save(stored_path)
     return stored_name, stored_path
-
 
 def parse_ultralytics_results(results):
     r = results[0]
@@ -120,12 +117,35 @@ def parse_ultralytics_results(results):
         })
     return dets
 
+# ---------------- Database Models ----------------
+class Detection(db.Model):
+    id = db.Column(db.String, primary_key=True)
+    type = db.Column(db.String)
+    client_id = db.Column(db.String)
+    uploaded_filename = db.Column(db.String)
+    annotated_filename = db.Column(db.String)
+    params = db.Column(db.JSON)
+    routing = db.Column(db.JSON)
+    timestamp = db.Column(db.String)
+
+class Department(db.Model):
+    __tablename__ = "department"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, unique=True, nullable=False)
+
+class DetectionDepartment(db.Model):
+    detection_id = db.Column(db.String, db.ForeignKey('detection.id'), primary_key=True)
+    department_id = db.Column(db.Integer, db.ForeignKey('department.id'), primary_key=True)
+    detection = db.relationship("Detection", backref=db.backref("departments", lazy=True))
+    department = db.relationship("Department")
+
+with app.app_context():
+    db.create_all()
 
 # ---------------- Endpoints ----------------
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok', 'time': now_str()})
-
 
 @app.route('/detect', methods=['POST'])
 def detect():
@@ -146,13 +166,11 @@ def detect():
     uid = str(uuid.uuid4())
     stored_name, stored_path = save_uploaded_file(f, prefix=uid)
 
-    # Run detection
     try:
         results = models.predict(stored_path, task_type=t, conf=0.25, imgsz=640)
     except Exception as e:
         return jsonify({'error': 'model inference failed', 'details': str(e)}), 500
 
-    # Extract params
     params = waste_processor.extract(stored_path, results) if t == 'waste' else pothole_processor.extract(stored_path, results)
 
     try:
@@ -170,7 +188,6 @@ def detect():
         'timestamp': now_str()
     }
 
-    # Reasoning and routing
     try:
         scores = kg_reasoner.reason(record)
     except Exception as e:
@@ -178,31 +195,72 @@ def detect():
         scores = {}
 
     routing = route_from_scores(scores)
-
-    # Add AI-based department assignment
-    assigned_dept = assign_department_auto(record)
-    routing["auto_assigned_department"] = assigned_dept
-    routing.setdefault("departments", []).append(assigned_dept)
+    assigned_depts = assign_departments_ml_threshold(record)
+    routing["auto_assigned_department"] = assigned_depts[0]
+    routing.setdefault("departments", []).extend(assigned_depts)
     record["routing"] = routing
 
-    # Save results
-    save_json(os.path.join(PARAMS_DIR, f"{uid}.json"), record)
-    return jsonify(record), 200
+    # ------------------------- SAVE TO POSTGRESQL -------------------------
+    try:
+        # Save main detection record
+        det = Detection(
+            id=uid,
+            type=t,
+            client_id=request.form.get('client_id'),
+            uploaded_filename=stored_name,
+            annotated_filename=annotated_name,
+            params=params,
+            routing=routing,
+            timestamp=now_str()
+        )
+        db.session.add(det)
 
+        # Save department(s) dynamically
+        for dept_name in assigned_depts:
+            dept = Department.query.filter_by(name=dept_name).first()
+            if dept:
+                dep = DetectionDepartment(detection_id=uid, department_id=dept.id)
+                db.session.add(dep)
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'database commit failed', 'details': str(e)}), 500
+
+    # ------------------------- SAVE IMAGE PER DEPARTMENT -------------------------
+    if annotated_name:
+        for dept in assigned_depts:
+            dept_folder = DEPT_DIRS.get(dept)
+            if dept_folder:
+                target_path = os.path.join(dept_folder, annotated_name)
+                source_path = os.path.join(ANNOTATED_DIR, annotated_name)
+                if os.path.exists(source_path):
+                    shutil.copy(source_path, target_path)
+
+    return jsonify(record), 200
 
 @app.route('/storage/annotated/<path:filename>', methods=['GET'])
 def get_annotated(filename):
     return send_from_directory(ANNOTATED_DIR, filename, as_attachment=False)
 
-
 @app.route('/detections/<id>', methods=['GET'])
 def get_detection(id):
-    fp = os.path.join(PARAMS_DIR, f"{id}.json")
-    if not os.path.exists(fp):
+    det = Detection.query.get(id)
+    if not det:
         return jsonify({'error': 'not found'}), 404
-    with open(fp, 'r', encoding='utf-8') as fh:
-        return jsonify(json.load(fh))
-
+    departments = [d.department.name for d in det.departments]
+    response = {
+        'id': det.id,
+        'type': det.type,
+        'client_id': det.client_id,
+        'uploaded_filename': det.uploaded_filename,
+        'annotated_filename': det.annotated_filename,
+        'params': det.params,
+        'routing': det.routing,
+        'departments': departments,
+        'timestamp': det.timestamp
+    }
+    return jsonify(response)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
